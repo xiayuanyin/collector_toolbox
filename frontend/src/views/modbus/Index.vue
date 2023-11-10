@@ -232,17 +232,17 @@ const echartsOptions = {
   },
   toolbox: {
     feature: {
-      // myTool1: {
-      //   show: true,
-      //   title: '导出',
-      //   icon: 'path://M432.45,595.444c0,2.177-4.661,6.82-11.305,6.82c-6.475,0-11.306-4.567-11.306-6.82s4.852-6.812,11.306-6.812C427.841,588.632,432.452,593.191,432.45,595.444L432.45,595.444z M421.155,589.876c-3.009,0-5.448,2.495-5.448,5.572s2.439,5.572,5.448,5.572c3.01,0,5.449-2.495,5.449-5.572C426.604,592.371,424.165,589.876,421.155,589.876L421.155,589.876z M421.146,591.891c-1.916,0-3.47,1.589-3.47,3.549c0,1.959,1.554,3.548,3.47,3.548s3.469-1.589,3.469-3.548C424.614,593.479,423.062,591.891,421.146,591.891L421.146,591.891zM421.146,591.891',
-      //   onclick: function (){
-      //     exportCSV('myToolHandler1')
-      //   }
-      // },
-      // saveAsImage: {
-      //   title: '导出源数据',
-      // }
+      myTool1: {
+        show: true,
+        title: '导出CSV',
+        icon: 'path://M1 1.5C1 0.671573 1.67157 0 2.5 0H10.7071L14 3.29289V13.5C14 14.3284 13.3284 15 12.5 15H2.5C1.67157 15 1 14.3284 1 13.5V1.5ZM2 6H5V7H3V10H5V11H2V6ZM9 6H6V9H8V10H6V11H9V8H7V7H9V6ZM11 6H10V9.70711L11.5 11.2071L13 9.70711V6H12V9.29289L11.5 9.79289L11 9.29289V6Z',
+        onclick: function (){
+          exportCSV(`modbus-export-data`)
+        }
+      },
+      saveAsImage:{
+        title: '下载为图片'
+      }
     }
   },
   xAxis: {
@@ -254,14 +254,30 @@ const echartsOptions = {
   },
   series: []
 }
-function exportCSV(filename, d) {
+function exportCSV(filename) {
   if (!/\.csv$/.test(filename)) {
     filename = `${filename}.csv`
   }
   // 获取导出的数据
-  var data = ["hello\t123\n1\t2\n3"]
+  var data = [echartsOptions.series.map(s=>['time', s.name].join(",")).join(',')]
+  let idx=0
+  while(true){
+    let rowData = []
+    echartsOptions.series.forEach((s, i)=>{
+      if(s.data[idx]){
+        rowData.push([s.data[idx][0].toLocaleString(), s.data[idx][1]])
+      }else{
+        rowData.push(['', ''])
+      }
+
+    })
+    if(rowData.map(r=>r.join('')).join('')==='') break
+    data.push(rowData.map(x=>x.join(',')).join(','))
+    idx++
+  }
+
   // 创建 Blob 对象
-  var blob = new Blob([data], {type: 'text/csv;charset=utf-8;'});
+  var blob = new Blob([data.join("\n")], {type: 'text/csv;charset=utf-8;'});
   // 创建下载链接
   var downloadLink = document.createElement('a');
   downloadLink.setAttribute('download', filename);
@@ -274,6 +290,7 @@ function exportCSV(filename, d) {
   document.body.removeChild(downloadLink);
 }
 let e
+let setOptionInterval
 export default {
   name: "ModbusIndex",
   components: {Plus, AddressDefForm},
@@ -331,7 +348,6 @@ export default {
             }
 
           })
-          e.setOption(echartsOptions)
         } else if (data.type === 'modbus_closed') {
           modbusConnectionInfo.status = 'idle'
           ElMessage.error("连接已关闭")
@@ -616,10 +632,15 @@ export default {
     // this.$websocket.send("online")
     // console.log(this.$websocket)
     e = this.$echarts.init(document.getElementById('a1'))
-    e.setOption(echartsOptions)
+    if(setOptionInterval) clearInterval(setOptionInterval)
+    // 1秒
+    setOptionInterval = setInterval(()=>{
+      e.setOption(echartsOptions)
+    }, 1000)
 
   },
   beforeDestroy() {
+    if(setOptionInterval) clearInterval(setOptionInterval)
     this.disconnect()
   }
 }
@@ -637,8 +658,8 @@ export default {
 }
 
 .echarts {
-//width: 600px; height: 800px;
-  flex: 1;
+  width: 800px; height: 600px;
+
 }
 
 .casted_value_text {

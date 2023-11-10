@@ -5,6 +5,7 @@ export const routes = [
     {
         path: "/",
         hidden: true,
+        redirect: "/modbus/index",
         name: "HOME",
         component: Home,
         meta: { title: "projectAttr", icon: "Grid", keepAlive: true },

@@ -12,7 +12,6 @@ import { getCurrentInstance } from 'vue';
 const { proxy } = getCurrentInstance();
 const ws = proxy.$websocket
 setTimeout(() => {
-  ws.send("hello from frontend")
   ws.send("ping")
 }, 1000)
 
