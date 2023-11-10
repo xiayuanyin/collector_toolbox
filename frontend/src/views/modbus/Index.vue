@@ -169,11 +169,6 @@ const connectInfo = reactive({
   interval: 1000,
   udp: false
 })
-const CacheKey = 'last_modbus_connect_info'
-const cache = localStorage.getItem(CacheKey)
-if (cache != null) {
-  Object.assign(connectInfo, JSON.parse(cache))
-}
 const modbusConnectionInfo = reactive({
   status: 'idle',
   id: null
@@ -371,7 +366,9 @@ export default {
           ElMessage.success("连接成功")
           this.$websocket.send('online', {id: r.id, type: 'modbus'})
           this.changeAddress()
-          localStorage.setItem(CacheKey, JSON.stringify(connectInfo))
+        } else {
+          modbusConnectionInfo.status = 'idle'
+          ElMessage.error("连接失败")
         }
       }).catch(e => {
         modbusConnectionInfo.status = 'idle'
