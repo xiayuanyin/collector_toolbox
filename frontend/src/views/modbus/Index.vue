@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1>Modbus Collector</h1>
-    <el-form style="width: 1200px" :inline="true">
+    <el-form :inline="true">
       <el-form-item label="Host">
         <el-input v-model="connectInfo.host" :disabled="modbusConnectionInfo.status!=='idle'"></el-input>
       </el-form-item>
@@ -25,14 +25,15 @@
       </el-form-item>
       <el-form-item>
         <el-button v-if="modbusConnectionInfo.status!=='connected'"
-                   :disabled="modbusConnectionInfo.status==='connecting'" type="primary" @click="connect">Connect
+                   :disabled="modbusConnectionInfo.status==='connecting'" type="primary" size="small" @click="connect">Connect
         </el-button>
-        <el-button v-if="modbusConnectionInfo.status==='connected'" type="danger" @click="disconnect">Disconnect
+        <el-button v-if="modbusConnectionInfo.status==='connected'" type="danger" size="small" @click="disconnect">Disconnect
         </el-button>
-        <el-button :icon="Plus" type="success" @click="addReader"></el-button>
+        <el-button :icon="Plus" type="success" size="small" @click="importProfile">导入配置</el-button>
+        <el-button :icon="Cloudy" type="warning" size="small" @click="exportProfile">导出配置</el-button>
       </el-form-item>
     </el-form>
-    <div style="display: flex; flex-direction: row">
+    <div style="display: flex; flex-direction: row; padding-left: 50px;">
       <el-tabs
           v-model="currentTab"
           type="card"
@@ -156,7 +157,7 @@
 import {reactive} from "vue";
 import {connectModbus, disconnectModbus, modbusWrite, sendModbusCollectAddress} from "@/api/modbus.js";
 import {ElMessage} from "element-plus";
-import {Edit, Minus, Plus} from "@element-plus/icons-vue";
+import {Edit, Minus, Plus, Cloudy} from "@element-plus/icons-vue";
 import AddressDefForm from "./components/AddressDefForm.vue";
 import {castValueToWord, castWordArrayTo} from "@/utils/binary_cast.js";
 
@@ -306,7 +307,7 @@ export default {
       ValueTypes,
       valueCasters,
       currentTab,
-      Plus, Minus, Edit
+      Plus, Minus, Edit, Cloudy
     }
   },
   sockets: {
@@ -406,8 +407,13 @@ export default {
       AddressFormDef.table = r.table
     },
     saveAddressDef() {
-      AddressFormDef.visible = false
       let idx = AddressFormDef.idx
+      let repeatAddress = Readers.find((r, i) => i!==idx && r.table === AddressFormDef.table && r.address === AddressFormDef.address && r.slave_id === AddressFormDef.slave_id)
+      if(repeatAddress){
+        ElMessage.error("地址重复")
+        return
+      }
+      AddressFormDef.visible = false
       if (Readers[idx] == null) {
         Readers.push({
           slave_id: 1,
@@ -536,13 +542,6 @@ export default {
           series.name = newName
         }
       }
-      // if(AddressCastFormDef.addToCharts){
-      //   let series = echartsOptions.series.find(s=>s.name===newName)
-      //   if(series){
-      //     series.min = AddressCastFormDef.chartsMin
-      //     series.max = AddressCastFormDef.chartsMax
-      //   }
-      // }
       AddressCastFormDef.visible = false
       c.slave_id = AddressCastFormDef.slave_id
       c.address = AddressCastFormDef.address
@@ -552,8 +551,6 @@ export default {
       c.WordReverse = AddressCastFormDef.WordReverse
       c.value = AddressCastFormDef.value
       c.addToCharts = AddressCastFormDef.addToCharts
-      // c.chartsMin = AddressCastFormDef.chartsMin
-      // c.chartsMax = AddressCastFormDef.chartsMax
       c.name = AddressCastFormDef.name
       echartsOptions.legend.data = echartsOptions.series.map(s => s.name)
     },
@@ -628,16 +625,63 @@ export default {
         console.log("cancel", e)
       });
     },
+    exportProfile(){
+      const json = {
+        Readers, connectInfo, valueCasters
+      }
+      const link = document.createElement("a");
+      const file = new Blob([JSON.stringify(json)], { type: 'text/plain' });
+      link.href = URL.createObjectURL(file);
+      link.download = "modbus-collector-config.json";
+      link.click();
+      setTimeout(function () {
+        URL.revokeObjectURL(link.href);
+      }, 100);
+    },
+    importProfile(){
+      let f = document.createElement('input')
+      f.type = 'file'
+      f.accept = '.json'
+      f.style.display = 'none'
+      document.body.appendChild(f)
+      f.onchange = (e)=>{
+        let file = e.target.files[0]
+        if(file.size>1024*1024*10){
+          ElMessage.error("文件过大")
+          document.body.removeChild(f)
+          return
+        }
+        console.log(file)
+        let reader = new FileReader()
+        reader.onload = (e)=>{
+          try{
+            let json = JSON.parse(e.target.result)
+            Object.assign(Readers, json.Readers)
+            Object.assign(connectInfo, json.connectInfo)
+            Object.assign(valueCasters, json.valueCasters)
+            echartsOptions.legend.data = valueCasters.filter(c=>c.addToCharts).map(c=>c.name)
+          }catch (e){
+            console.log(e)
+            ElMessage.error("导入失败")
+          }finally {
+            document.body.removeChild(f)
+          }
+        }
+        reader.readAsText(file)
+      }
+      f.oncancel = ()=>{
+        document.body.removeChild(f)
+      }
+      f.click()
+    }
 
   },
 
   mounted() {
-    // this.$websocket.send("online")
-    // console.log(this.$websocket)
     e = this.$echarts.init(document.getElementById('a1'))
     if(setOptionInterval) clearInterval(setOptionInterval)
-    // 1秒
     setOptionInterval = setInterval(()=>{
+      if(modbusConnectionInfo.status!=='connected') return
       e.setOption(echartsOptions)
     }, 1000)
 
