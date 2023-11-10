@@ -28,7 +28,7 @@ function swap16(int16ArrayBuffer){
         int16ArrayBuffer[i * 2 + 1] = t
     }
 }
-const parseBufferTo = (type, arr, LE)=> {
+const parseBufferTo = (type, arr, LE, wordReverse)=> {
     if(type==="String"){
         let a = new Uint8Array(new Uint16Array(arr).buffer)
         if(!LE) swap16(a)
@@ -40,11 +40,12 @@ const parseBufferTo = (type, arr, LE)=> {
     if(LE){
         arr2 = arr2.reverse()
     }
+    if(wordReverse) arr2 = arr2.reverse()
     let a = new Uint8Array(new Uint16Array(arr2).buffer)
     if(!LE) swap16(a)
     return new DataView(a.buffer)[getTypeMapping(type).read]()
 }
-export const castValueToWord = (valueType, value, LE)=>{
+export const castValueToWord = (valueType, value, LE, wordReverse)=>{
     if(valueType==='String'){
         let arr = new TextEncoder().encode(value);
         if(arr.byteLength%2===1) arr = new Uint8Array([...arr, 0])
@@ -56,16 +57,18 @@ export const castValueToWord = (valueType, value, LE)=>{
     let buffer = new ArrayBuffer(t.bytes)
     let dv = new DataView(buffer)
     dv[t.write](0, value, !LE)
-    return Array.from(new Uint16Array(dv.buffer)).reverse()
+    let res = Array.from(new Uint16Array(dv.buffer))
+    // 正常情况下是需要reverse的
+    return wordReverse ? res : res.reverse()
 }
-export const castWordArrayTo = (targetType, wordArray, LE = false)=>{
+export const castWordArrayTo = (targetType, wordArray, LE = false, wordReverse)=>{
     try{
         if(targetType==='String'){
             let arr = new Uint8Array(Uint16Array.from(wordArray).buffer)
             if(!LE) swap16(arr)
             return new TextDecoder().decode(arr)
         }else{
-            return parseBufferTo(targetType, new Uint16Array(wordArray), LE)
+            return parseBufferTo(targetType, new Uint16Array(wordArray), LE, wordReverse)
         }
     }catch (e){
         return 'N/A'

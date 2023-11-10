@@ -85,7 +85,7 @@
       <div id="a1" :class="s.echarts"></div>
     </div>
 
-    <el-dialog v-model="AddressFormDef.visible" title="地址定义">
+    <el-dialog v-model="AddressFormDef.visible" title="设定读取地址">
       <el-form label-width="150px">
         <el-form-item label="Slave ID">
           <el-input v-model.number="AddressFormDef.slave_id">
@@ -121,10 +121,11 @@
                :title="`地址：${AddressCastFormDef.address}(SlaveID: ${AddressCastFormDef.slave_id})`">
       <el-form>
         <el-form-item label="转换数据类型">
-          <el-select v-model="AddressCastFormDef.type">
+          <el-select v-model="AddressCastFormDef.type" style="width: 100px">
             <el-option v-for="x in ValueTypes" :label="x" :value="x"></el-option>
           </el-select>
           <el-switch v-model="AddressCastFormDef.LE" active-text="LittleEndian"></el-switch>
+          <el-switch v-model="AddressCastFormDef.WordReverse" active-text="WordReverse"></el-switch>
         </el-form-item>
         <el-form-item>
           <el-switch v-if="AddressCastFormDef.type!=='String'" v-model="AddressCastFormDef.addToCharts"
@@ -153,11 +154,11 @@
 </template>
 <script>
 import {reactive} from "vue";
-import {connectModbus, disconnectModbus, modbusWrite, sendModbusCollectAddress} from "../../api/modbus.js";
+import {connectModbus, disconnectModbus, modbusWrite, sendModbusCollectAddress} from "@/api/modbus.js";
 import {ElMessage} from "element-plus";
 import {Edit, Minus, Plus} from "@element-plus/icons-vue";
 import AddressDefForm from "./components/AddressDefForm.vue";
-import {castValueToWord, castWordArrayTo} from "../../utils/binary_cast.js";
+import {castValueToWord, castWordArrayTo} from "@/utils/binary_cast.js";
 
 const ValueTypes = ["Word", "DWord", "Int16", "Int32", "Int64", "UInt16", "UInt32", "UInt64", "Float", "Double", "String"]
 const connectInfo = reactive({
@@ -193,6 +194,7 @@ const AddressCastFormDef = reactive({
   address: 100,
   type: 'word',
   LE: false,
+  WordReverse: false,
   value: 0,
   addToCharts: false,
   // chartsMin: 0,
@@ -203,9 +205,9 @@ const Readers = reactive([
   {
     slave_id: 1,
     table: 'holding_registers',
-    address: 100,
+    address: 0,
     length: 20,
-    during: -999,
+    during: null,
     data: [],
     base64: null
   },
@@ -329,7 +331,7 @@ export default {
           valueCasters.forEach(c => {
             if (c.table === data.table && c.address >= data.address && c.address < addressEnd && data.slave_id === c.slave_id) {
               let word_array = data.data.slice(c.address - data.address)
-              c.value = castWordArrayTo(c.type, word_array, c.LE)
+              c.value = castWordArrayTo(c.type, word_array, c.LE, c.WordReverse)
               if (c.addToCharts) {
                 let series = echartsOptions.series.find(s => s.name === c.name)
                 if (series == null) {
@@ -438,17 +440,22 @@ export default {
       // this.$websocket.send('modbus_read', {id: modbusConnectionInfo.id, type: 'modbus', address: this.Readers[0].address, length: this.Readers[0].length, table: this.Readers[0].table})
     },
     addReader() {
-      // Readers.push({
-      //   slave_id: 1,
-      //   table: 'holding_registers',
-      //   address: 0,
-      //   length: 10,
-      //   data: [],
-      // })
       this.editAddressDef(-1)
-      // this.changeAddress()
     },
     removeReader(i) {
+      let reader = Readers[i]
+      if (reader == null) return
+      if (reader.table === 'holding_registers' || reader.table === 'input_registers') {
+        while(true){
+          let idx = valueCasters.findIndex(c => c.table === reader.table && c.slave_id === reader.slave_id && c.address >= reader.address && c.address < reader.address + reader.length)
+          if (idx < 0) break
+          if(valueCasters[idx].addToCharts){
+            let seriesIdx = echartsOptions.series.findIndex(s => s.name === valueCasters[idx].name)
+            if (seriesIdx>=0)  echartsOptions.series.splice(seriesIdx, 1)
+          }
+          valueCasters.splice(idx, 1)
+        }
+      }
       Readers.splice(i, 1)
     },
     getCaster(reader, casterAddress) {
@@ -458,7 +465,7 @@ export default {
       if (AddressCastFormDef.idx < 0 || AddressCastFormDef.idx >= valueCasters.length) return
       if (AddressCastFormDef.addToCharts) {
         let seriesIdx = echartsOptions.series.findIndex(s => s.name === AddressCastFormDef.name)
-        if (seriesIdx) {
+        if (seriesIdx>=0) {
           echartsOptions.series.splice(seriesIdx, 1)
         }
       }
@@ -477,10 +484,9 @@ export default {
           slave_id: reader.slave_id,
           type: 'Word',
           LE: false,
+          WordReverse: false,
           value: 0,
           addToCharts: false,
-          // chartsMin: 0,
-          // chartsMax: 10000,
 
         }
       }
@@ -497,7 +503,6 @@ export default {
       // AddressCastFormDef.chartsMax = c.chartsMax
     },
     saveCaster() {
-
       let idx = AddressCastFormDef.idx
       let c = valueCasters[idx]
       let addNewSeries = false
@@ -522,9 +527,6 @@ export default {
           type: 'line',
           symbol: 'none',
           hoverAnimation: false,
-          // min: AddressCastFormDef.chartsMin,
-          // max: AddressCastFormDef.chartsMax,
-          // yAxisIndex: echartsOptions.series.length,
           data: []
         }
         echartsOptions.series.push(series)
@@ -547,6 +549,7 @@ export default {
       c.table = AddressCastFormDef.table
       c.type = AddressCastFormDef.type
       c.LE = AddressCastFormDef.LE
+      c.WordReverse = AddressCastFormDef.WordReverse
       c.value = AddressCastFormDef.value
       c.addToCharts = AddressCastFormDef.addToCharts
       // c.chartsMin = AddressCastFormDef.chartsMin
@@ -611,7 +614,7 @@ export default {
         } else {
           value = Number(value)
         }
-        let words = castValueToWord(reader.type, value, reader.LE)
+        let words = castValueToWord(reader.type, value, reader.LE, reader.WordReverse)
         modbusWrite(modbusConnectionInfo.id, {
           id: modbusConnectionInfo.id,
           slave_id: reader.slave_id,
