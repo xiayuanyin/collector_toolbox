@@ -1,19 +1,28 @@
-# README
+# PLC通讯工具箱
 
-## About
+## 介绍
 
-This is the official Wails Vue template.
+各类PLC的数据采集，数据转换，数据写入，数据展示，数据图表、导出等功能的集合。
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+目前支持协议：Modbus(TCP/UDP)
 
-## Live Development
+后续待支持协议：
+- Modbus RTU
+- S7comm
+- OPC UA
+- MC
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+## TODO
 
-## Building
+- 美化界面（前端目前是草稿样式）
+- 考虑剥掉Wails框架，程序启动后直接调用系统默认浏览器打开
 
-To build a redistributable, production mode package, use `wails build`.
+## 功能截图
+
+![概览.jpg](static%2F%E6%A6%82%E8%A7%88.jpg)
+
+![采集地址.jpg](static%2F%E9%87%87%E9%9B%86%E5%9C%B0%E5%9D%80.jpg)
+
+![编辑变量.jpg](static%2F%E7%BC%96%E8%BE%91%E5%8F%98%E9%87%8F.jpg)
+
+![写入.jpg](static%2F%E5%86%99%E5%85%A5.jpg)
